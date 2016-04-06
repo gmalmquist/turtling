@@ -18,11 +18,42 @@ bak = {
   aggressive=false,
 }
 
+function bak.Stack()
+  local stack = {index=0}
+
+  function stack.push(value)
+    stack[stack.index] = value
+    stack.index = stack.index + 1
+    print("Pushed ", stack.index, " = ", value)
+  end
+
+  function stack.pop()
+    if stack.index > 0 then
+      stack.index = stack.index - 1
+      value = stack[stack.index]
+      stack[stack.index] = nil
+      print("Popped ", stack.index, " = ", value)
+      return value
+    end
+    return nil
+  end
+
+  function stack.size()
+    return stack.index
+  end
+
+  function stack.isEmpty()
+    return stack.size() == 0
+  end
+
+  return stack
+end
+
 function bak.debugDump()
   local position = bak.position
   local facing = bak.facing
   print("Pos= ", position.x, ", ", position.y, ", ", position.z)
-  print("Facing= ", facing.x, ", ", facing.y, ", ", facing.z)
+  print("Facing= ", facing.x, ", ", facing.z)
 end
 
 function bak._addpos(x, y, z)
@@ -157,6 +188,28 @@ function bak.resetPosition()
   bak.setFacing(0, 1)
 end
 
+bak.faceStack = bak.Stack()
+bak.posStack = bak.Stack()
+
+function bak.pushPosition()
+  local x,y,z = bak.getPosition()
+  bak.posStack.push({x=x, y=y, z=z})
+end
+
+function bak.popPosition()
+  local p = bak.posStack.pop()
+  bak.moveTo(p.x, p.y, p.z)
+end
+
+function bak.pushFacing()
+  bak.faceStack.push({x=bak.facing.x, z=bak.facing.z})
+end
+
+function bak.popFacing()
+  local f = bak.faceStack.pop()
+  bak.setFacing(f.x, f.z)
+end
+
 function bak.refuel(count)
   foundFuel = false
   count = count or (64*16)
@@ -178,6 +231,19 @@ function bak.refuel(count)
   return foundFuel
 end
 
+function bak.refuelWith(name)
+  for i=1,16 do
+    if turtle.getItemCount(i) > 0 then
+      if turtle.turtle.getItemDetail(i).name == name then
+        turtle.select(i)
+        turtle.refuel()
+        return true
+      end
+    end
+  end
+  return false
+end
+
 function bak.hasSlotsLeft()
   local slots = 0
   for i=1,16 do
@@ -195,6 +261,18 @@ function bak.dumpInventory()
     turtle.drop()
   end
   turtle.select(slot)
+end
+
+function bak.selectItemName(name)
+  for i=1,16 do
+    if turtle.getItemCount(i) > 0 then
+      if turtle.getItemDetail(i).name == name then
+        turtle.select(i)
+        return true
+      end
+    end
+  end
+  return false
 end
 
 function bak.testBasicMovement()

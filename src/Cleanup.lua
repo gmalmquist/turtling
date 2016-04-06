@@ -4,8 +4,9 @@ print(" bak = [", bak, "]")
 bak.aggressive = true
 
 print("Variables.")
-clearUp = 8
-clearSide = (16+13)
+clearUp = 2
+clearSide = 10
+offsetY = 1
 
 -- clearUp = 5
 -- clearSide = 6
@@ -34,7 +35,7 @@ function doCleanup()
     bak.resetPosition()
     fuelDance()
   end
-  for layer=(clearUp-1),0,-1 do
+  for layer=(clearUp-1+offsetY),offsetY,-1 do
     print("Layer ", layer)
     for row=0,(clearSide-1) do
       print("Row ", row)

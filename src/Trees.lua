@@ -4,9 +4,11 @@ os.loadAPI("Library")
 SAPLING_ID = "minecraft:sapling"
 LOG_ID = "minecraft:log"
 PLANKS_ID = "minecraft:planks"
+DIRT_ID = "minecraft:dirt"
+GRASS_ID = "minecraft:grass"
 
-sizeX = 8
-sizeZ = 8
+treeRows = 4
+treeCols = 4
 
 function fuelDance()
   print("Waiting for fuel.")
@@ -27,14 +29,49 @@ function ensureFuel()
   return true
 end
 
+function gatherItems()
+  for i=1,4 do
+    turtle.suck()
+    turtle.turnRight()
+  end
+end
+
 function harvestTree()
   bak.pushPosition()
   bak.pushFacing()
   
   bak.forward()
-  bak.moveBy(0,10,0)
-  bak.moveBy(0,-10,0)
 
+  bak.pushPosition()
+  while turtle.detectUp() and bak.up() do
+    for i=1,4 do
+      turtle.dig()
+      bak.turnRight()
+    end
+  end
+  bak.popPosition()
+
+  gatherItems()
+  
+  bak.popPosition()
+  bak.popFacing()
+end
+
+function checkDirt()
+  bak.pushFacing()
+  bak.pushPosition()
+  bak.forward()
+  local hasBlock, block = turtle.inspectDown()
+  if not hasBlock then
+    if bak.selectItemName(DIRT_ID) then
+      bak.placeDown()
+    end
+  elseif (block.name ~= DIRT_ID) and (block.name ~= GRASS_ID) then
+    bak.digDown()
+    if bak.selectItemName(DIRT_ID) then
+      bak.placeDown()
+    end
+  end
   bak.popPosition()
   bak.popFacing()
 end
@@ -50,33 +87,66 @@ function placeSapling()
       harvestTree()
     end
   end
+
+  -- Make sure there's dirt here.
+  checkDirt()
+
   if bak.selectItemName(SAPLING_ID) then
     return turtle.place()
   end
   return false
 end
 
-function patrol()
-  ensureFuel()
-  local cols = (sizeX/2)-1
-  local rows = (sizeZ/2)-1
-  for i=0,cols do
-    for j=0,rows do
-      local x = i*2
-      local z = ((i%2==0) and j or (rows-j))*2
-      bak.moveTo(x, 0, z+1)
-      bak.turnRight()
-      -- todo: handle the two non-empty cases.
-      placeSapling()
-      if j == rows then
-        bak.moveTo(x, 0, z+1)
+function unloadItems()
+  bak.resetPosition()
+  bak.turnRight()
+  bak.turnRight()
+  for i=1,16 do 
+    if turtle.getItemCount(i) > 0 then
+      name = turtle.getItemDetail(i).name
+      if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID then
+        turtle.select(i)
+        turtle.drop()
       end
     end
   end
-  bak.resetPosition()
+end
+
+function patrol()
+  ensureFuel()
+  for c=1, treeCols do
+    local parity = (c%2==1)
+    local turn = parity and bak.turnRight or bak.turnLeft
+    local x = (c-1)*2
+    for r=1, treeRows do
+      local z = (r*2)-1
+      if not parity then
+        z = (treeRows*2) - z
+      end
+      bak.moveTo(x, 0, z)
+      
+      bak.pushFacing()
+      turn()
+      bak.suck()
+      placeSapling()
+      bak.popFacing()
+      bak.suck()
+
+      bak.forward()
+      bak.suck()
+    end
+    turn()
+    for f=1,2 do
+      bak.forward()
+    end
+  end
+  unloadItems()
 end
 
 bak.aggressive = true
+
+local a,b = turtle.inspectDown()
+print(b.name)
 
 for i=1,16 do
   if turtle.getItemCount(i) > 0 then
@@ -84,9 +154,7 @@ for i=1,16 do
   end
 end
 
-if not bak.selectItemName(SAPLING_ID) then
-  print("I have no saplings.")
-else
+while true do
   patrol()
 end
 

@@ -18,13 +18,24 @@ bak = {
   aggressive=false,
 }
 
+bak.suck = turtle.suck
+bak.suckUp = turtle.suckUp
+bak.suckDown = turtle.suckDown
+
+bak.place = turtle.place
+bak.placeUp = turtle.placeUp
+bak.placeDown = turtle.placeDown
+
+bak.dig = turtle.dig
+bak.digUp = turtle.digUp
+bak.digDown = turtle.digDown
+
 function bak.Stack()
   local stack = {index=0}
 
   function stack.push(value)
     stack[stack.index] = value
     stack.index = stack.index + 1
-    print("Pushed ", stack.index, " = ", value)
   end
 
   function stack.pop()
@@ -32,7 +43,6 @@ function bak.Stack()
       stack.index = stack.index - 1
       value = stack[stack.index]
       stack[stack.index] = nil
-      print("Popped ", stack.index, " = ", value)
       return value
     end
     return nil
@@ -86,6 +96,7 @@ function bak.turnRight()
 end
 
 function bak.forward()
+  bak.suck()
   while not turtle.forward() do
     if not bak.aggressive or not turtle.dig() then
       return false
@@ -96,6 +107,7 @@ function bak.forward()
 end
 
 function bak.up()
+  bak.suckUp()
   while not turtle.up() do
     if not bak.aggressive or not turtle.digUp() then
       return false
@@ -106,6 +118,7 @@ function bak.up()
 end
 
 function bak.down()
+  bak.suckDown()
   while not turtle.down() do
     if not bak.aggressive or not turtle.digDown() then
       return false
@@ -234,7 +247,7 @@ end
 function bak.refuelWith(name)
   for i=1,16 do
     if turtle.getItemCount(i) > 0 then
-      if turtle.turtle.getItemDetail(i).name == name then
+      if turtle.getItemDetail(i).name == name then
         turtle.select(i)
         turtle.refuel()
         return true

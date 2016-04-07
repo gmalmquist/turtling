@@ -30,6 +30,10 @@ bak.dig = turtle.dig
 bak.digUp = turtle.digUp
 bak.digDown = turtle.digDown
 
+bak.drop = turtle.drop
+bak.dropDown = turtle.dropDown
+bak.dropUp = turtle.dropUp
+
 function bak.Stack()
   local stack = {index=0}
 

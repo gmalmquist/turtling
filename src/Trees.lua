@@ -10,17 +10,95 @@ GRASS_ID = "minecraft:grass"
 treeRows = 4
 treeCols = 4
 
+function createFuel()
+  print("Trying to create fuel.")
+  bak.resetPosition()
+
+  function storeNotLogs()
+    bak.setFacing(-1, 0) -- Face the scratch chest.
+    -- Dump anything except exactly one stack of logs.
+    local sawLogs = false
+    for i=1,16 do
+      if turtle.getItemCount(i) > 0 then
+        if sawLogs or turtle.getItemDetail(i).name ~= LOG_ID then
+          turtle.select(i)
+          bak.drop()
+        elseif turtle.getItemDetail(i).name == LOG_ID then
+          sawLogs = true
+        end
+      end
+    end
+    return sawLogs
+  end
+
+  function retrieveItems()
+    print("Retrieving items.")
+    bak.setFacing(-1, 0)
+    while turtle.suck() do 
+      -- Try and get everything back.
+    end
+  end
+
+  if not storeNotLogs() then
+    retrieveItems()
+    bak.setFacing(0, -1)
+    while turtle.suck() do
+      -- See if we can find logs in the output.
+    end
+
+    if not storeNotLogs() then
+      print("I don't seem to have any logs.")
+      retrieveItems()
+      return false
+    end
+  end
+
+  -- Select an empty slot.
+  for i=1,16 do 
+    if turtle.getItemCount(i) == 0 then
+      turtle.select(i)
+      break
+    end
+  end
+
+  if not turtle.craft() then
+    print("Failed to craft planks.")
+    return false
+  end
+
+  for i=1,16 do 
+    local count = turtle.getItemCount(i)
+    if count > 0 and turtle.getItemDetail(i).name == PLANKS_ID then
+      print("Eating ", count, " planks.")
+      turtle.select(i)
+      turtle.refuel()
+    end
+  end
+
+  retrieveItems()
+
+  print("Fuel level: ", turtle.getFuelLevel())
+  return true
+end
+
 function fuelDance()
   print("Waiting for fuel.")
-  while not bak.refuel() do
+  while not bak.refuelWith(PLANKS_ID) do
     bak.turnRight()
   end
 end
 
 function ensureFuel()
   local level = turtle.getFuelLevel()
+  print("Fuel level is: ", level)
   if level < 500 then
     print("Need to refuel.")
+    while turtle.getFuelLevel() < 500 and createFuel() do
+      print("Made and ate some planks.")
+    end
+    if turtle.getFuelLevel() >= 500 then
+      return true
+    end
     if not bak.refuelWith(PLANKS_ID) then
       bak.resetPosition()
       fuelDance()
@@ -101,19 +179,23 @@ function unloadItems()
   bak.resetPosition()
   bak.turnRight()
   bak.turnRight()
+  local keptOneLog = false
   for i=1,16 do 
     if turtle.getItemCount(i) > 0 then
       name = turtle.getItemDetail(i).name
       if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID then
-        turtle.select(i)
-        turtle.drop()
+        if name ~= LOG_ID or keptOneLog then
+          turtle.select(i)
+          turtle.drop()
+        elseif name == LOG_ID then
+          keptOneLog = true
+        end
       end
     end
   end
 end
 
 function patrol()
-  ensureFuel()
   for c=1, treeCols do
     local parity = (c%2==1)
     local turn = parity and bak.turnRight or bak.turnLeft
@@ -140,22 +222,15 @@ function patrol()
       bak.forward()
     end
   end
-  unloadItems()
 end
 
 bak.aggressive = true
 
-local a,b = turtle.inspectDown()
-print(b.name)
-
-for i=1,16 do
-  if turtle.getItemCount(i) > 0 then
-    print(turtle.getItemDetail(i).name)
-  end
-end
-
+ensureFuel()
 while true do
   patrol()
+  ensureFuel()
+  unloadItems()
 end
 
 bak.aggressive = false

@@ -1,8 +1,5 @@
-extent = {x=8,y=64,z=8}
-
 print("Loading library...")
 os.loadAPI("Library")
-bak.aggressive = true
 
 
 function fuelDance()
@@ -28,24 +25,26 @@ function ensureFuel()
   return true
 end
 
-ensureFuel()
+function bak.mineChunk(extent)
+  bak.aggressive = true
+  ensureFuel()
 
-parity = false
-for i=0,(extent.x-1) do
-  for j=0,(extent.z-1) do
-  	parity = not parity
-    ensureFuel()
-    local ys = parity and 0 or -extent.y
-    local ye = parity and -extent.y or 0
-    bak.moveTo(i, ys, j)
-    bak.moveTo(i, ye, j)
-    if not parity then
-      bak.resetPosition()
-      bak.setFacing(0, -1)
-      bak.dumpInventory()
-	end
+  parity = false
+  for i=0,(extent.x-1) do
+    for j=0,(extent.z-1) do
+    	parity = not parity
+      ensureFuel()
+      local ys = parity and 0 or -extent.y
+      local ye = parity and -extent.y or 0
+      bak.moveTo(i, ys, j)
+      bak.moveTo(i, ye, j)
+      if not parity then
+        bak.resetPosition()
+        bak.setFacing(0, -1)
+        bak.dumpInventory()
+  	end
+    end
   end
+
+  bak.aggressive = false
 end
-
-
-bak.aggressive = false

@@ -292,6 +292,63 @@ function bak.selectItemName(name)
   return false
 end
 
+function bak.smartRefuel(options)
+  options = options or {}
+
+  function itemFilter(name)
+    if options.item and name ~= options.item then
+      return false
+    end
+    return not options.itemFilter or options.itemFilter(name)
+  end
+
+  function needsFuel()
+    return not options.level or turtle.getFuelLevel() < options.level
+  end
+
+  local foundFuel = false
+
+  for i=1,16 do 
+    if not needsFuel() then
+      return true
+    end
+    if turtle.getItemCount(i) > 0 then
+      local name = turtle.getItemDetail(i).name
+      if itemFilter(name) then
+        turtle.select(i)
+        turtle.refuel()
+        foundFuel = true
+      end
+    end
+  end
+
+  if options.level then
+    return not needsFuel()
+  end
+
+  return foundFuel
+end
+
+function bak.organizeInventory()
+  local itemMap = {}
+
+  for i=1,16 do 
+    if turtle.getItemCount(i) > 0 then
+      local name = turtle.getItemDetail(i).name
+
+      if itemMap[name] then
+        turtle.select(i)
+        turtle.transferTo(itemMap[name])
+        if turtle.getItemCount(i) > 0 then
+          itemMap[name] = i
+        end
+      else
+        itemMap[name] = i
+      end
+    end
+  end
+end
+
 function bak.testBasicMovement()
   print("Testing relative movement.")
   bak.debugDump()

@@ -228,6 +228,7 @@ bak.aggressive = true
 
 ensureFuel()
 while true do
+  bak.organizeInventory()
   patrol()
   ensureFuel()
   unloadItems()

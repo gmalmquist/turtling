@@ -63,6 +63,40 @@ function bak.Stack()
   return stack
 end
 
+function bak.Set(init)
+  local set = {store={}, length=0}
+
+  function set.add(value)
+    if not set.store[value] then
+      set.store[value] = 1
+      set.length = set.length + 1
+    end
+  end
+
+  function set.remove(value)
+    if set.store[value] then 
+      set.store[value] = nil
+      set.length = set.length - 1
+    end
+  end
+
+  function set.contains(value)
+    return set.store[value]
+  end
+
+  function set.size()
+    return set.length
+  end
+
+  if init then
+    for i,v in ipairs(init) do
+      set.add(v)
+    end
+  end
+
+  return set
+end
+
 function bak.debugDump()
   local position = bak.position
   local facing = bak.facing
@@ -348,6 +382,96 @@ function bak.organizeInventory()
     end
   end
 end
+
+function bak.mineDFS(options)
+  local diggable = options.blocks;
+  local boundary = options.boundary;
+  local update = options.update;
+
+  function inBounds(p)
+    if not boundary then
+      return true
+    end
+    if (boundary.minX and p.x < boundary.minX) or
+       (boundary.minY and p.y < boundary.minY) or
+       (boundary.minZ and p.z < boundary.minZ) or
+       (boundary.maxX and p.x > boundary.maxX) or
+       (boundary.maxY and p.y > boundary.maxY) or 
+       (boundary.maxZ and p.z > boundary.maxZ) then
+       return false
+    end
+    return true
+  end
+
+  function isDiggable(name)
+    if diggable and not diggable.contains(name) then
+      print(" ", name, " is not diggable.")
+    end
+    return not diggable or diggable.contains(name)
+  end
+
+  function getPos()
+    return {x=bak.position.x, y=bak.position.y, z=bak.position.z}
+  end
+
+  local visited = {}
+  local frontier = bak.Stack()
+  frontier.push(getPos())
+
+  function pos2str(p)
+    return "(" .. p.x .. ", " .. p.y .. ", " .. p.z .. ")"
+  end
+
+  function pushMaybe(adjacent, inspector)
+    if visited[adjacent] or not inBounds(adjacent) then
+      print("  ", pos2str(adjacent), " is visited or out of bounds.")
+      return false
+    end
+    local success, data = inspector()
+    print("  ", pos2str(adjacent), " existence: ", success, " (", data, ")")
+    if success and isDiggable(data.name) then 
+      print("  pushing ", pos2str(adjacent))
+      frontier.push(adjacent)
+      return true
+    end
+    return false
+  end
+
+  while not frontier.isEmpty() do
+    if update then
+      update()
+    end
+
+    local vertex = frontier.pop()
+    if not visited[vertex] then
+      visited[vertex] = 1
+      print("Expanding: <", vertex.x, ", ", vertex.y, ", ", vertex.z, ">")
+      print("  frontier size: ", frontier.size())
+
+      bak.moveTo(vertex.x, vertex.y, vertex.z)
+      pushMaybe({
+        x=vertex.x, 
+        y=vertex.y - 1, 
+        z=vertex.z
+      }, turtle.inspectDown)
+      for i=1,4 do 
+        pushMaybe({
+          x=vertex.x + bak.facing.x, 
+          y=vertex.y, 
+          z=vertex.z + bak.facing.z
+        }, turtle.inspect)
+        bak.turnRight()
+      end
+      pushMaybe({
+        x=vertex.x, 
+        y=vertex.y + 1, 
+        z=vertex.z
+      }, turtle.inspectUp)
+    end
+  end
+
+end
+
 
 function bak.testBasicMovement()
   print("Testing relative movement.")

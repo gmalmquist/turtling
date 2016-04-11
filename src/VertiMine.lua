@@ -1,51 +1,23 @@
-extent = {x=8,y=64,z=8}
+#include CommonMine.lua
 
-print("Loading library...")
-os.loadAPI("Library")
-bak.aggressive = true
-
-
-function fuelDance()
-  print("Waiting for fuel.")
-  while not bak.refuel() do
-    bak.turnRight()
-  end
-end
-
-function ensureFuel()
-  local level = turtle.getFuelLevel()
-  if level < 500 then
-    print("Need to refuel.")
-    if not bak.refuel() then
-      bak.resetPosition()
-      bak.setFacing(-1, 0)
-      if bak.suck() and bak.smartRefuel{level=level, item="minecraft:planks"} then
-        return true
+function bak.vertiMine(options)
+  bak.generiMine(options, function(context)
+    local extent, offset = context.extent, context.offset
+    local parity = false
+    for i=0,(abs(extent.x)-1) do
+      for j=0,(abs(extent.z)-1) do
+      	parity = not parity
+        context.ensureFuel()
+        local ys = (parity and 0 or -extent.y) + offset.y
+        local ye = (parity and -extent.y or 0) + offset.y
+        local x = i * sign(extent.x) + offset.x
+        local z = j * sign(extent.z) + offset.z
+        bak.moveTo(x, ys, z)
+        bak.moveTo(x, ye, z)
+        if not parity and context.halfFull() then
+          context.unloadInventory()
+    	  end
       end
-      fuelDance()
     end
-  end
-  return true
+  end)
 end
-
-ensureFuel()
-
-parity = false
-for i=0,(extent.x-1) do
-  for j=0,(extent.z-1) do
-  	parity = not parity
-    ensureFuel()
-    local ys = parity and 0 or -extent.y
-    local ye = parity and -extent.y or 0
-    bak.moveTo(i, ys, j)
-    bak.moveTo(i, ye, j)
-    if not parity then
-      bak.resetPosition()
-      bak.setFacing(0, -1)
-      bak.dumpInventory()
-	end
-  end
-end
-
-
-bak.aggressive = false

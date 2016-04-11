@@ -24,6 +24,34 @@ class Installer(object):
       if os.path.isdir(path):
         yield path
 
+  def processed_file_lines(self, src, processed=None):
+    if processed is None:
+      processed = set()
+    processed.add(src)
+    include_prefix = '#include '
+    with open(src, 'r') as f:
+      yield '\n-- begin {} --\n'.format(os.path.basename(src))
+      for line in f:
+        if not line.strip().startswith(include_prefix):
+          yield line 
+          continue
+        include_path = line.strip()[len(include_prefix):].strip()
+        include_path = os.path.join(os.path.dirname(src), include_path)
+        if not os.path.exists(include_path):
+          print('Error {}: Include not found: {}.'.format(src, include_path))
+        if include_path in processed:
+          yield '\n-- already included {} --\n'.format(os.path.basename(include_path))
+          continue
+        for line in self.processed_file_lines(include_path, processed):
+          yield line
+        yield '\n-- continue {} --\n'.format(os.path.basename(src))
+      yield '\n-- end {} --\n'.format(os.path.basename(src))
+      yield '\n'
+
+  def process_file(self, src, dst):
+    with open(dst, 'w') as f:
+      f.write(''.join(self.processed_file_lines(src)))
+
   def install_file(self, src):
     src = os.path.normpath(src)
     dst_name = os.path.basename(src)
@@ -35,7 +63,7 @@ class Installer(object):
       if os.path.exists(dst):
         print(' removing existing file... '.format(dst), end='')
         os.remove(dst)
-      shutil.copyfile(src, dst)
+      self.process_file(src, dst)
       print('Done.')
 
   def install(self):

@@ -114,6 +114,35 @@ function gatherItems()
   end
 end
 
+function harvestTreeClever()
+  bak.pushPosition()
+  bak.pushFacing()
+
+  function fuelMeMaybe()
+    bak.pushPosition()
+    bak.pushFacing()
+
+    ensureFuel()
+
+    bak.up()
+
+    bak.popPosition()
+    bak.popFacing()
+  end
+
+  bak.forward()
+  if turtle.detectUp() and bak.up() then
+    bak.mineDFS({
+      blocks=bak.Set({"minecraft:log", "minecraft:leaves"}),
+      boundary={minY=1},
+      update=fuelMeMaybe
+    })
+  end
+
+  bak.popPosition()
+  bak.popFacing()
+end
+
 function harvestTree()
   bak.pushPosition()
   bak.pushFacing()

@@ -1,4 +1,4 @@
--- Startup Script for Eggie (the tree-cutter).
+-- Startup Script for roo (the tree-cutter 2.0).
 #include Library.lua
 
 -- GPS origin is at x=-358, y=0, z=468

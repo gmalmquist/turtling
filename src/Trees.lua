@@ -1,5 +1,4 @@
-print("Loading library...")
-os.loadAPI("Library")
+#include Library.lua
 
 SAPLING_ID = "minecraft:sapling"
 LOG_ID = "minecraft:log"

@@ -314,16 +314,44 @@ function bak.dumpInventory()
   turtle.select(slot)
 end
 
+function bak.getItemName(i)
+  if turtle.getItemCount(i) == 0 then
+    return ""
+  end
+  return turtle.getItemDetail(i).name
+end
+
 function bak.selectItemName(name)
   for i=1,16 do
-    if turtle.getItemCount(i) > 0 then
-      if turtle.getItemDetail(i).name == name then
-        turtle.select(i)
-        return true
-      end
+    if bak.getItemName(i) == name then
+      turtle.select(i)
+      return true
     end
   end
   return false
+end
+
+function bak.getTotalItemCount(name)
+  local count = 0
+  for i=1,16 do
+    if bak.getItemName(i) == name then
+      count = count + turtle.getItemCount(i)
+    end
+  end
+  return count
+end
+
+function bak.useItems(name, maxItems, useFunc)
+  while turtle.selectItemName(name) and maxItems > 0 do
+    local count = turtle.getItemCount()
+    local toUse = (count < maxItems) and count or maxItems
+    if useFunc() then
+      maxItems = maxItems - toUse
+    else
+      return false
+    end
+  end
+  return maxItems <= 0
 end
 
 function bak.smartRefuel(options)

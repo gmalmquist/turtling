@@ -9,10 +9,13 @@ DRUM_ID = "ExtraUtilities:drum"
 
 function retrieveLava()
 
+  local lastFuel = 0
+
   function fuelDance()
     print("Fuel is low. :-(")
     bak.resetPosition()
-    while turtle.getFuelLevel() < 500 then
+    while turtle.getFuelLevel() < 500 do
+      bak.smartRefuel{level=500}
       bak.turnRight()
     end
     bak.resetRotation()
@@ -20,9 +23,12 @@ function retrieveLava()
 
   function needMoreFuel()
     local level = turtle.getFuelLevel()
-    print("Fuel: ", level)
+    if level ~= lastFuel then 
+      print("Fuel: ", level)
+      lastFuel = level
+    end
     if level < 500 then
-      if turtle.smartRefuel{level=500} then
+      if bak.smartRefuel{level=500} then
         return false
       end
       return true
@@ -39,7 +45,7 @@ function retrieveLava()
 
   function checkForLava()
     local isBlock, block = turtle.inspectDown()
-    if isBlock and (block.name == LAVA_ID or block.name == LAVA_FLOW_ID) do 
+    if isBlock and (block.name == LAVA_ID or block.name == LAVA_FLOW_ID) then
       print("Found lava.")
       bak.selectItemName(EMPTY_BUCKET_ID)
       bak.placeDown()
@@ -51,48 +57,52 @@ function retrieveLava()
   function huntForLava()
     print("Hunting for lava.")
     local visited = bak.Set()
-    local frontier = bak.Stack()
-
-    function adjacent(p)
-      return {
-        {x = p.x, y = p.y, z = p.z-1},
-        {x = p.x-1, y = p.y, z = p.z},
-        {x = p.x+1, y = p.y, z = p.z},
-        {x = p.x, y = p.y, z = p.z+1},
-      }
+    visited.hash = function(pt)
+      return pt.x .. "," .. pt.y .. "," .. pt.z
     end
-
-    function expand(vertex)
-      for i,a in ipairs(adjacent(vertex))
-        if not visited.contains(a) then
-          frontier.push(a)
-        end
-      end
-    end
-
     local pushed = 0
+
+    local frontier = bak.Stack()
     frontier.push(bak.position)
 
-    while not frontier.isEmpty() do
-      if turtle.getFuelLevel() < 500 then
+    function expand(v)
+      local adj = {
+        {x=v.x, y=v.y, z=v.z-1},
+        {x=v.x-1, y=v.y, z=v.z},
+        {x=v.x+1, y=v.y, z=v.z},
+        {x=v.x, y=v.y, z=v.z+1},
+      }
+      for i, p in ipairs(adj) do
+        if not visited.contains(p) then 
+          frontier.push(p)
+        end
+      end
+    end
 
+    while not needMoreFuel() and not frontier.isEmpty() do 
+      if checkForLava() then
+        print("Found lava, stopping.")
+        break
       end
 
-      vertex = frontier.pop()
-      if not visited.contains(vertex) do
-        visited.add(vertex)
+      bak.pushPosition()
+      pushed = pushed + 1
 
-        pushed = pushed + 1
-        bak.pushPosition()
+      local vertex = frontier.pop()
+      if not visited.contains(vertex) then
+        visited.add(vertex)
+        local p = bak.position
+        expand(p)
+
+        print("Vertex: ", vertex.x, ", ", vertex.y, ", ", vertex.z)
+        print("Frontier: ", frontier.size())
 
         bak.moveTo(vertex.x, vertex.y, vertex.z)
-
-        if checkForLava() or needMoreFuel() then
-          break
-        end
-
-        expand(vertex)
       end
+    end
+
+    if frontier.isEmpty() then
+      print("Completed search.")
     end
 
     for i=1,pushed do
@@ -111,8 +121,7 @@ function retrieveLava()
 
   descend()
   huntForLava()
-  resetPosition()
-  resetRotation()
+  bak.resetPosition()
 end
 
 retrieveLava()

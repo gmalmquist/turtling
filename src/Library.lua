@@ -12,6 +12,20 @@ function sign(x)
   end
 end
 
+function shallowEquals(a, b)
+  for k, v in pairs(a) do
+    if v ~= b[k] then
+      return false
+    end
+  end
+  for k, v in pairs(b) do
+    if v ~= a[k] then
+      return false
+    end
+  end
+  return true
+end
+
 bak = {
   facing={x=0,z=1},
   position={x=0,y=0,z=0},
@@ -81,7 +95,12 @@ function bak.Set(init)
   end
 
   function set.contains(value)
-    return set.store[value]
+    for v in pairs(set.store) do
+      if shallowEquals(value, v) then
+        return true
+      end 
+    end 
+    return false
   end
 
   function set.size()
@@ -231,7 +250,7 @@ end
 function bak.moveTo(x, y, z)
   local p = bak.position
   local dx, dy, dz = x-p.x, y-p.y, z-p.z
-  bak.moveBy(dx, dy, dz)
+  return bak.moveBy(dx, dy, dz)
 end
 
 function bak.resetPosition()

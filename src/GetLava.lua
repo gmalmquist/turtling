@@ -12,7 +12,7 @@ function retrieveLava()
   function fuelDance()
     print("Fuel is low. :-(")
     bak.resetPosition()
-    while turtle.getFuelLevel() < 500 then
+    while turtle.getFuelLevel() < 500 do
       bak.turnRight()
     end
     bak.resetRotation()
@@ -39,7 +39,7 @@ function retrieveLava()
 
   function checkForLava()
     local isBlock, block = turtle.inspectDown()
-    if isBlock and (block.name == LAVA_ID or block.name == LAVA_FLOW_ID) do 
+    if isBlock and (block.name == LAVA_ID or block.name == LAVA_FLOW_ID) then
       print("Found lava.")
       bak.selectItemName(EMPTY_BUCKET_ID)
       bak.placeDown()
@@ -51,47 +51,35 @@ function retrieveLava()
   function huntForLava()
     print("Hunting for lava.")
     local visited = bak.Set()
-    local frontier = bak.Stack()
-
-    function adjacent(p)
-      return {
-        {x = p.x, y = p.y, z = p.z-1},
-        {x = p.x-1, y = p.y, z = p.z},
-        {x = p.x+1, y = p.y, z = p.z},
-        {x = p.x, y = p.y, z = p.z+1},
-      }
-    end
-
-    function expand(vertex)
-      for i,a in ipairs(adjacent(vertex))
-        if not visited.contains(a) then
-          frontier.push(a)
-        end
-      end
-    end
-
     local pushed = 0
-    frontier.push(bak.position)
 
-    while not frontier.isEmpty() do
-      if turtle.getFuelLevel() < 500 then
-
+    while not needMoreFuel() do 
+      if checkForLava() then
+        break
       end
 
-      vertex = frontier.pop()
-      if not visited.contains(vertex) do
-        visited.add(vertex)
+      bak.pushPosition()
+      pushed = pushed + 1
 
-        pushed = pushed + 1
-        bak.pushPosition()
+      local p = bak.position 
+      local vertex = {x=p.x, y=p.y, z=p.z}
+      if visited.contains(vertex) then
+        break
+      end
+      visited.add(vertex)
 
-        bak.moveTo(vertex.x, vertex.y, vertex.z)
-
-        if checkForLava() or needMoreFuel() then
+      local wentForward = false
+      for i=1,4 do 
+        if not bak.forward() then
+          bak.turnRight()
+        else
+          wentForward = true
           break
         end
+      end
 
-        expand(vertex)
+      if not wentForward then
+        break
       end
     end
 
@@ -111,8 +99,8 @@ function retrieveLava()
 
   descend()
   huntForLava()
-  resetPosition()
-  resetRotation()
+  bak.resetPosition()
+  bak.resetRotation()
 end
 
 retrieveLava()

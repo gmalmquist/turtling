@@ -80,7 +80,15 @@ end
 function bak.Set(init)
   local set = {store={}, length=0}
 
+  function set._hash(value)
+    if set.hash then
+      return set.hash(value)
+    end
+    return value
+  end
+
   function set.add(value)
+    value = set._hash(value)
     if not set.store[value] then
       set.store[value] = 1
       set.length = set.length + 1
@@ -88,6 +96,7 @@ function bak.Set(init)
   end
 
   function set.remove(value)
+    value = set._hash(value)
     if set.store[value] then 
       set.store[value] = nil
       set.length = set.length - 1
@@ -95,11 +104,15 @@ function bak.Set(init)
   end
 
   function set.contains(value)
+    value = set._hash(value)
+    if set.hash then
+      return set.store[value]
+    end
     for v in pairs(set.store) do
       if shallowEquals(value, v) then
         return true
       end 
-    end 
+    end
     return false
   end
 

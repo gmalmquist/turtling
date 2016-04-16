@@ -22,7 +22,7 @@ function retrieveLava()
     local level = turtle.getFuelLevel()
     print("Fuel: ", level)
     if level < 500 then
-      if turtle.smartRefuel{level=500} then
+      if bak.smartRefuel{level=500} then
         return false
       end
       return true
@@ -51,6 +51,9 @@ function retrieveLava()
   function huntForLava()
     print("Hunting for lava.")
     local visited = bak.Set()
+    visited.hash = function(pt)
+      return pt.x .. "," .. pt.y .. "," .. pt.z
+    end
     local pushed = 0
 
     while not needMoreFuel() do 

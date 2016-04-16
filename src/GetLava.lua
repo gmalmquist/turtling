@@ -9,10 +9,13 @@ DRUM_ID = "ExtraUtilities:drum"
 
 function retrieveLava()
 
+  local lastFuel = 0
+
   function fuelDance()
     print("Fuel is low. :-(")
     bak.resetPosition()
     while turtle.getFuelLevel() < 500 do
+      bak.smartRefuel{level=500}
       bak.turnRight()
     end
     bak.resetRotation()
@@ -20,7 +23,10 @@ function retrieveLava()
 
   function needMoreFuel()
     local level = turtle.getFuelLevel()
-    print("Fuel: ", level)
+    if level ~= lastFuel then 
+      print("Fuel: ", level)
+      lastFuel = level
+    end
     if level < 500 then
       if bak.smartRefuel{level=500} then
         return false
@@ -56,34 +62,47 @@ function retrieveLava()
     end
     local pushed = 0
 
-    while not needMoreFuel() do 
+    local frontier = bak.Stack()
+    frontier.push(bak.position)
+
+    function expand(v)
+      local adj = {
+        {x=v.x, y=v.y, z=v.z-1},
+        {x=v.x-1, y=v.y, z=v.z},
+        {x=v.x+1, y=v.y, z=v.z},
+        {x=v.x, y=v.y, z=v.z+1},
+      }
+      for i, p in ipairs(adj) do
+        if not visited.contains(p) then 
+          frontier.push(p)
+        end
+      end
+    end
+
+    while not needMoreFuel() and not frontier.isEmpty() do 
       if checkForLava() then
+        print("Found lava, stopping.")
         break
       end
 
       bak.pushPosition()
       pushed = pushed + 1
 
-      local p = bak.position 
-      local vertex = {x=p.x, y=p.y, z=p.z}
-      if visited.contains(vertex) then
-        break
-      end
-      visited.add(vertex)
+      local vertex = frontier.pop()
+      if not visited.contains(vertex) then
+        visited.add(vertex)
+        local p = bak.position
+        expand(p)
 
-      local wentForward = false
-      for i=1,4 do 
-        if not bak.forward() then
-          bak.turnRight()
-        else
-          wentForward = true
-          break
-        end
-      end
+        print("Vertex: ", vertex.x, ", ", vertex.y, ", ", vertex.z)
+        print("Frontier: ", frontier.size())
 
-      if not wentForward then
-        break
+        bak.moveTo(vertex.x, vertex.y, vertex.z)
       end
+    end
+
+    if frontier.isEmpty() then
+      print("Completed search.")
     end
 
     for i=1,pushed do
@@ -103,7 +122,6 @@ function retrieveLava()
   descend()
   huntForLava()
   bak.resetPosition()
-  bak.resetRotation()
 end
 
 retrieveLava()

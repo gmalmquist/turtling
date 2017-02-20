@@ -13,6 +13,15 @@ function sign(x)
 end
 
 function shallowEquals(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= type(b) then
+    return false
+  end
+  if type(a) ~= "table" then
+    return false
+  end
   for k, v in pairs(a) do
     if v ~= b[k] then
       return false
@@ -30,6 +39,7 @@ bak = {
   facing={x=0,z=1},
   position={x=0,y=0,z=0},
   aggressive=false,
+  eats=nil,
 }
 
 bak.suck = turtle.suck
@@ -129,6 +139,8 @@ function bak.Set(init)
   return set
 end
 
+bak.eats = bak.Set()
+
 function bak.debugDump()
   local position = bak.position
   local facing = bak.facing
@@ -165,10 +177,25 @@ function bak.turnRight()
   return true
 end
 
+function bak.eatMaybe(inspector, digger)
+  if bak.aggressive then
+    -- No need to do further work.
+    return digger()
+  end
+
+  local success, data = inspector()
+  print(string.format("Can we aggressively eat %s?", data.name))
+  if success and bak.eats and bak.eats.contains(data.name) then 
+    return digger()
+  end
+
+  return false
+end
+
 function bak.forward()
   bak.suck()
   while not turtle.forward() do
-    if not bak.aggressive or not turtle.dig() then
+    if not bak.eatMaybe(turtle.inspect, turtle.dig) then
       return false
     end
   end
@@ -179,7 +206,7 @@ end
 function bak.up()
   bak.suckUp()
   while not turtle.up() do
-    if not bak.aggressive or not turtle.digUp() then
+    if not bak.eatMaybe(turtle.inspectUp, turtle.digUp) then
       return false
     end
   end
@@ -190,7 +217,7 @@ end
 function bak.down()
   bak.suckDown()
   while not turtle.down() do
-    if not bak.aggressive or not turtle.digDown() then
+    if not bak.eatMaybe(turtle.inspectDown, turtle.digDown) then
       return false
     end
   end
@@ -247,17 +274,19 @@ function bak.moveBy(x, y, z)
     end
     return true
   end
+  local success = true
   if abs(x) < abs(z) then
-    tryMove(bak.faceX, x)
-    tryMove(bak.faceZ, z)
+    success = success and tryMove(bak.faceX, x)
+    success = success and tryMove(bak.faceZ, z)
   else
-    tryMove(bak.faceZ, z)
-    tryMove(bak.faceX, x)
+    success = success and tryMove(bak.faceZ, z)
+    success = success and tryMove(bak.faceX, x)
   end
   mover = (y>0) and bak.up or bak.down
   for i=1,abs(y) do
-    mover()
+    success = success and mover()
   end
+  return success
 end
 
 function bak.moveTo(x, y, z)
@@ -374,7 +403,7 @@ function bak.getTotalItemCount(name)
 end
 
 function bak.useItems(name, maxItems, useFunc)
-  while turtle.selectItemName(name) and maxItems > 0 do
+  while bak.selectItemName(name) and maxItems > 0 do
     local count = turtle.getItemCount()
     local toUse = (count < maxItems) and count or maxItems
     if useFunc() then
@@ -440,6 +469,198 @@ function bak.organizeInventory()
         itemMap[name] = i
       end
     end
+  end
+end
+
+function bak.saveState()
+  local pos = bak.position
+  local rot = bak.facing
+  local h = fs.open("save-state.dat", "w")
+  h.writeLine(string.format("%d", pos.x))
+  h.flush()
+  h.writeLine(string.format("%d", pos.y))
+  h.flush()
+  h.writeLine(string.format("%d", pos.z))
+  h.flush()
+  h.writeLine(string.format("%d", rot.x))
+  h.flush()
+  h.writeLine(string.format("%d", rot.z))
+  h.close()
+  sleep(0) -- yield execution after saving state
+end
+
+function bak.loadState()
+  if not fs.exists("save-state.dat") then
+    print("No save state exists.")
+    return false
+  end
+  print("Loading orientation information from file.")
+  local pos = bak.position
+  local rot = bak.facing
+  local h = fs.open("save-state.dat", "r")
+
+  local text = h.readAll()
+
+  if text == "" then
+    print("Save file is empty, assuming we're at the origin already.")
+    return true
+  end
+
+  local lines = {}
+  local i = 1
+  
+  for token in string.gmatch(text, "[^\n]+") do
+   lines[i] = token
+   i = i + 1
+  end
+
+  if i ~= 6 then
+    print("Save file is corrupt.")
+    return false
+  end
+
+  pos.x = tonumber(lines[1])
+  pos.y = tonumber(lines[2])
+  pos.z = tonumber(lines[3])
+  rot.x = tonumber(lines[4])
+  rot.z = tonumber(lines[5])
+  h.close()
+  print(string.format(
+    "x=%d, y=%d, z=%d, faceX=%d, faceZ=%d",
+    pos.x, pos.y, pos.z, rot.x, rot.z
+  ))
+  return true
+end
+
+function bak.clearState() 
+  if not fs.exists("save-state.dat") then
+    print("No state to clear.")
+    return
+  else
+    print("Deleting old orientation information.")
+    fs.delete("save-state.dat")
+  end
+end
+
+function bak.gpsSync(offset)
+  -- First check to see if we have a modem equipped in either hand.
+  -- If not, see if our inventory has a modem, and equip it.
+  -- Then ask for GPS position.
+
+  function query()
+    local x, y, z = gps.locate()
+    if not x then
+      print("Failed to find GPS location.")
+      return false
+    end
+
+    x = x + offset.x
+    y = y + offset.y
+    z = z + offset.z
+
+    print(string.format("GPS location: %d, %d, %d.", x, y, z))
+
+    bak.position.x = x
+    bak.position.y = y
+    bak.position.z = z
+
+    print("Determining turtle orientation")
+
+    local stuck = true
+    while stuck do
+      for i=1,4 do
+        if turtle.forward() then
+          x, y, z = gps.locate()
+
+          x = x + offset.x
+          y = y + offset.y
+          z = z + offset.z
+
+          let dx = x - bak.position.x
+          let dz = z - bak.position.z 
+
+          bak.facing.x = dx
+          bak.facing.z = dz
+
+          bak.position.x = x
+          bak.position.y = y
+          bak.position.z = z
+
+          bak.moveBy(0, 0, -1)
+          return true
+        end
+        turtle.turnRight() 
+      end
+
+      if stuck then
+        if not turtle.up() then 
+          print("Turtle appears to be trapped, and cannot determine its rotation.")
+          return false
+        end
+      end
+    end
+
+    return false
+  end
+
+  function isModemSelected()
+    local detail = turtle.getItemDetail()
+    return (detail != nil
+      and detail.name == "ComputerCraft:CC-Peripheral"
+      and detail.damage == 1)
+  end
+
+  for i=1,16 do
+    turtle.select(i)
+    if isModemSelected() then
+      print("Equipping modem to make gps query.")
+      turtle.equipLeft() -- equip modem
+      local result = query()
+      print("Unequipping modem again.")
+      turtle.equipLeft() -- unequip modem
+      return result
+    end
+  end
+
+  -- Find an empty spot in the inventory.
+  local foundEmptySlot = false
+  for i=1,16 do
+    if turtle.getItemCount(i) == 0 then
+      turtle.select(i)
+      foundEmptySlot = true
+      break
+    end
+  end
+
+  if foundEmptySlot then 
+    turtle.equipLeft()
+    if isModemSelected() then
+      print("Found a modem in my left hand.")
+      hasModem = true
+    end
+    turtle.equipLeft()
+
+    if hasModem then
+      return query()
+    end
+
+    turtle.equipRight()
+    if isModemSelected() then
+      print("Found a modem in my right hand.")
+      hasModem = true
+    end
+    turtle.equipRight()
+
+    if hasModem then
+      return query()
+    end
+
+    print("Turtle has no modem in inventory or in equipment.")
+    return false
+  else 
+    print("Turtle has no space to check to see if it has a modem.")
+    print("Trying to query, hoping for the best.")
+    return query()
   end
 end
 

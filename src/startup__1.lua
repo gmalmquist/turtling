@@ -6,7 +6,7 @@
 bak.gpsSync({
   x=-395 - (-358),
   y=71 - 0,
-  z=461 - 468,
+  z=461 - 468
 })
 
 bak.eats = bak.Set({"minecraft:log", "minecraft:leaves", "minecraft:sapling"})

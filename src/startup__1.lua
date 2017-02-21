@@ -4,9 +4,13 @@
 -- GPS origin is at x=-358, y=0, z=468
 -- Farm origin is at x=-395, y=71, z=461
 bak.gpsSync({
-  x=-395 - (-358),
-  y=71 - 0,
-  z=461 - 468
+  x= -358 - (-395) + 1,
+  y=-72,
+  z=461 - 468 + 12
+}, {
+  x=1,
+  y=1,
+  z=-1
 })
 
 bak.eats = bak.Set({"minecraft:log", "minecraft:leaves", "minecraft:sapling"})
@@ -18,5 +22,5 @@ end
 print("Facing forward")
 bak.faceZ(1)
 
---print("Starting tree farming application.")
---shell.run("Trees")
+print("Starting tree farming application.")
+shell.run("Trees")

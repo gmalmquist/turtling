@@ -8,7 +8,7 @@ import shutil
 
 
 SAVE_PATH = 'C:\\Finicky\\FTB\\FTBInfinity\\minecraft\\saves\\Termina'
-COMPUTER_SCOPE_PATTERN = re.compile(r'^(.*?)__(\d+).lua$')
+COMPUTER_SCOPE_PATTERN = re.compile(r'^(.*?)__(\d+)$')
 
 
 class Installer(object):
@@ -58,7 +58,7 @@ class Installer(object):
     src = os.path.normpath(src)
     dst_name = os.path.basename(src)
     dst_name = dst_name[:dst_name.find('.')]
-    scope_match = COMPUTER_SCOPE_PATTERN.match(src)
+    scope_match = COMPUTER_SCOPE_PATTERN.match(dst_name)
     scope_target = None
     if scope_match:
       dst_name = scope_match.group(1)

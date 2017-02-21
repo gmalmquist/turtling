@@ -406,7 +406,7 @@ function bak.getTotalItemCount(name)
 end
 
 function bak.useItems(name, maxItems, useFunc)
-  while turtle.selectItemName(name) and maxItems > 0 do
+  while bak.selectItemName(name) and maxItems > 0 do
     local count = turtle.getItemCount()
     local toUse = (count < maxItems) and count or maxItems
     if useFunc() then
@@ -508,7 +508,7 @@ function bak.loadState()
     print("Save file is empty, assuming we're at the origin already.")
     return true
   end
-  
+
   local lines = {}
   local i = 1
   
@@ -542,6 +542,120 @@ function bak.clearState()
   else
     print("Deleting old orientation information.")
     fs.delete("save-state.dat")
+  end
+end
+
+function bak.queryGps()
+  -- First check to see if we have a modem equipped in either hand.
+  -- If not, see if our inventory has a modem, and equip it.
+  -- Then ask for GPS position.
+
+  function query()
+    local x, y, z = gps.locate()
+    if not x then
+      print("Failed to find GPS location.")
+      return false
+    end
+
+    print(string.format("GPS location: %d, %d, %d.", x, y, z))
+
+    bak.position.x = x
+    bak.position.y = y
+    bak.position.z = z
+
+    print("Determining turtle orientation")
+
+    local stuck = true
+    while stuck do
+      for i=1,4 do
+        if turtle.forward() then
+          x, y, z = gps.locate()
+
+          let dx = x - gps.position.x
+          let dz = z - gps.position.z 
+
+          bak.facing.x = dx
+          bak.facing.z = dz
+
+          bak.position.x = x
+          bak.position.y = y
+          bak.position.z = z
+
+          bak.moveBy(0, 0, -1)
+          return true
+        end
+        turtle.turnRight() 
+      end
+
+      if stuck then
+        if not turtle.up() then 
+          print("Turtle appears to be trapped, and cannot determine its rotation.")
+          return false
+        end
+      end
+    end
+
+    return false
+  end
+
+  function isModemSelected()
+    local detail = turtle.getItemDetail()
+    return (detail != nil
+      and detail.name == "ComputerCraft:CC-Peripheral"
+      and detail.damage == 1)
+  end
+
+  for i=1,16 do
+    turtle.select(i)
+    if isModemSelected() then
+      print("Equipping modem to make gps query.")
+      turtle.equipLeft() -- equip modem
+      local result = query()
+      print("Unequipping modem again.")
+      turtle.equipLeft() -- unequip modem
+      return result
+    end
+  end
+
+  -- Find an empty spot in the inventory.
+  local foundEmptySlot = false
+  for i=1,16 do
+    if turtle.getItemCount(i) == 0 then
+      turtle.select(i)
+      foundEmptySlot = true
+      break
+    end
+  end
+
+  if foundEmptySlot then 
+    turtle.equipLeft()
+    if isModemSelected() then
+      print("Found a modem in my left hand.")
+      hasModem = true
+    end
+    turtle.equipLeft()
+
+    if hasModem then
+      return query()
+    end
+
+    turtle.equipRight()
+    if isModemSelected() then
+      print("Found a modem in my right hand.")
+      hasModem = true
+    end
+    turtle.equipRight()
+
+    if hasModem then
+      return query()
+    end
+
+    print("Turtle has no modem in inventory or in equipment.")
+    return false
+  else 
+    print("Turtle has no space to check to see if it has a modem.")
+    print("Trying to query, hoping for the best.")
+    return query()
   end
 end
 

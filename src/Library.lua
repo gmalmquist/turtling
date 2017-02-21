@@ -542,7 +542,7 @@ function bak.clearState()
   end
 end
 
-function bak.gpsSync(offset)
+function bak.gpsSync(offset, scale)
   -- First check to see if we have a modem equipped in either hand.
   -- If not, see if our inventory has a modem, and equip it.
   -- Then ask for GPS position.
@@ -554,9 +554,9 @@ function bak.gpsSync(offset)
       return false
     end
 
-    x = x + offset.x
-    y = y + offset.y
-    z = z + offset.z
+    x = (x + offset.x) * scale.x
+    y = (y + offset.y) * scale.y
+    z = (z + offset.z) * scale.z
 
     print(string.format("GPS location: %d, %d, %d.", x, y, z))
 
@@ -572,12 +572,12 @@ function bak.gpsSync(offset)
         if turtle.forward() then
           x, y, z = gps.locate()
 
-          x = x + offset.x
-          y = y + offset.y
-          z = z + offset.z
+          x = (x + offset.x) * scale.x
+          y = (y + offset.y) * scale.y
+          z = (z + offset.z) * scale.z
 
-          let dx = x - bak.position.x
-          let dz = z - bak.position.z 
+          local dx = x - bak.position.x
+          local dz = z - bak.position.z 
 
           bak.facing.x = dx
           bak.facing.z = dz
@@ -605,9 +605,7 @@ function bak.gpsSync(offset)
 
   function isModemSelected()
     local detail = turtle.getItemDetail()
-    return (detail != nil
-      and detail.name == "ComputerCraft:CC-Peripheral"
-      and detail.damage == 1)
+    return (detail ~= nil and detail.name == "ComputerCraft:CC-Peripheral" and detail.damage == 1)
   end
 
   for i=1,16 do

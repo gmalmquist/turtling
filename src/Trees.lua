@@ -5,6 +5,7 @@ LOG_ID = "minecraft:log"
 PLANKS_ID = "minecraft:planks"
 DIRT_ID = "minecraft:dirt"
 GRASS_ID = "minecraft:grass"
+MODEM_ID = "ComputerCraft:CC-Peripheral"
 
 treeRows = 4
 treeCols = 4
@@ -19,13 +20,15 @@ function createFuel()
     local sawLogs = false
     for i=1,16 do
       if turtle.getItemCount(i) > 0 then
-        if sawLogs or turtle.getItemDetail(i).name ~= LOG_ID then
-          turtle.select(i)
-          bak.drop()
-        elseif turtle.getItemDetail(i).name == LOG_ID then
-          sawLogs = true
+        if turtle.getItemDetail(i) ~= MODEM_ID then
+          if sawLogs or turtle.getItemDetail(i).name ~= LOG_ID then
+            turtle.select(i)
+            bak.drop()
+          elseif turtle.getItemDetail(i).name == LOG_ID then
+            sawLogs = true
+          end
         end
-      end
+      end 
     end
     return sawLogs
   end
@@ -211,7 +214,7 @@ function unloadItems()
   for i=1,16 do 
     if turtle.getItemCount(i) > 0 then
       name = turtle.getItemDetail(i).name
-      if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID then
+      if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID and name ~= MODEM_ID then
         if name ~= LOG_ID or keptOneLog then
           turtle.select(i)
           turtle.drop()

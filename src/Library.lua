@@ -153,7 +153,6 @@ function bak._addpos(x, y, z)
   p.x = p.x + x
   p.y = p.y + y
   p.z = p.z + z
-  bak.saveState()
 end
 
 function bak.getPosition()
@@ -166,7 +165,6 @@ function bak.turnLeft()
   end
   local face = bak.facing
   face.x, face.z = -face.z, face.x
-  bak.saveState()
   return true
 end
 
@@ -176,7 +174,6 @@ function bak.turnRight()
   end
   local face = bak.facing
   face.x, face.z = face.z, -face.x
-  bak.saveState()
   return true
 end
 
@@ -545,7 +542,7 @@ function bak.clearState()
   end
 end
 
-function bak.queryGps()
+function bak.gpsSync(offset)
   -- First check to see if we have a modem equipped in either hand.
   -- If not, see if our inventory has a modem, and equip it.
   -- Then ask for GPS position.
@@ -556,6 +553,10 @@ function bak.queryGps()
       print("Failed to find GPS location.")
       return false
     end
+
+    x = x + offset.x
+    y = y + offset.y
+    z = z + offset.z
 
     print(string.format("GPS location: %d, %d, %d.", x, y, z))
 
@@ -571,8 +572,12 @@ function bak.queryGps()
         if turtle.forward() then
           x, y, z = gps.locate()
 
-          let dx = x - gps.position.x
-          let dz = z - gps.position.z 
+          x = x + offset.x
+          y = y + offset.y
+          z = z + offset.z
+
+          let dx = x - bak.position.x
+          let dz = z - bak.position.z 
 
           bak.facing.x = dx
           bak.facing.z = dz

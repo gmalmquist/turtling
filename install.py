@@ -3,10 +3,12 @@
 from __future__ import print_function, with_statement
 
 import os
+import re
 import shutil
 
 
 SAVE_PATH = 'C:\\Finicky\\FTB\\FTBInfinity\\minecraft\\saves\\Termina'
+COMPUTER_SCOPE_PATTERN = re.compile(r'^(.*?)__(\d+)$')
 
 
 class Installer(object):
@@ -56,7 +58,14 @@ class Installer(object):
     src = os.path.normpath(src)
     dst_name = os.path.basename(src)
     dst_name = dst_name[:dst_name.find('.')]
+    scope_match = COMPUTER_SCOPE_PATTERN.match(dst_name)
+    scope_target = None
+    if scope_match:
+      dst_name = scope_match.group(1)
+      scope_target = scope_match.group(2)
     for folder in self.computers_iter():
+      if scope_match and scope_target != os.path.basename(folder):
+        continue
       dst = os.path.normpath(os.path.join(folder, dst_name))
       hr_rel_dst = os.path.relpath(dst, self.computer_folder)
       print('Installing {} -> {} ... '.format(os.path.basename(src), hr_rel_dst), end='')

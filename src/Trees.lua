@@ -1,11 +1,11 @@
-print("Loading library...")
-os.loadAPI("Library")
+#include Library.lua
 
 SAPLING_ID = "minecraft:sapling"
 LOG_ID = "minecraft:log"
 PLANKS_ID = "minecraft:planks"
 DIRT_ID = "minecraft:dirt"
 GRASS_ID = "minecraft:grass"
+MODEM_ID = "ComputerCraft:CC-Peripheral"
 
 treeRows = 4
 treeCols = 4
@@ -212,7 +212,7 @@ function unloadItems()
   for i=1,16 do 
     if turtle.getItemCount(i) > 0 then
       name = turtle.getItemDetail(i).name
-      if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID then
+      if name ~= SAPLING_ID and name ~= DIRT_ID and name ~= PLANKS_ID and name ~= MODEM_ID then
         if name ~= LOG_ID or keptOneLog then
           turtle.select(i)
           turtle.drop()

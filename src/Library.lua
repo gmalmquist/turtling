@@ -12,10 +12,38 @@ function sign(x)
   end
 end
 
+function shallowEquals(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= type(b) then
+    return false
+  end
+  if type(a) ~= "table" then
+    return false
+  end
+  for k, v in pairs(a) do
+    if v ~= b[k] then
+      return false
+    end
+  end
+  for k, v in pairs(b) do
+    if v ~= a[k] then
+      return false
+    end
+  end
+  return true
+end
+
 bak = {
   facing={x=0,z=1},
   position={x=0,y=0,z=0},
   aggressive=false,
+  eats=nil,
+  gpsOffset={x=0,y=0,z=0},
+  -- NB: z has to be negative here, because the turnLeft/Right methods
+  -- only work properly if they can make assumptions about right-hand rules.
+  gpsScale={x=1,y=1,z=-1}
 }
 
 bak.suck = turtle.suck
@@ -66,7 +94,15 @@ end
 function bak.Set(init)
   local set = {store={}, length=0}
 
+  function set._hash(value)
+    if set.hash then
+      return set.hash(value)
+    end
+    return value
+  end
+
   function set.add(value)
+    value = set._hash(value)
     if not set.store[value] then
       set.store[value] = 1
       set.length = set.length + 1
@@ -74,6 +110,7 @@ function bak.Set(init)
   end
 
   function set.remove(value)
+    value = set._hash(value)
     if set.store[value] then 
       set.store[value] = nil
       set.length = set.length - 1
@@ -81,7 +118,16 @@ function bak.Set(init)
   end
 
   function set.contains(value)
-    return set.store[value]
+    value = set._hash(value)
+    if set.hash then
+      return set.store[value]
+    end
+    for v in pairs(set.store) do
+      if shallowEquals(value, v) then
+        return true
+      end 
+    end
+    return false
   end
 
   function set.size()
@@ -96,6 +142,8 @@ function bak.Set(init)
 
   return set
 end
+
+bak.eats = bak.Set()
 
 function bak.debugDump()
   local position = bak.position
@@ -133,10 +181,25 @@ function bak.turnRight()
   return true
 end
 
+function bak.eatMaybe(inspector, digger)
+  if bak.aggressive then
+    -- No need to do further work.
+    return digger()
+  end
+
+  local success, data = inspector()
+  print(string.format("Can we aggressively eat %s?", data.name))
+  if success and bak.eats and bak.eats.contains(data.name) then 
+    return digger()
+  end
+
+  return false
+end
+
 function bak.forward()
   bak.suck()
   while not turtle.forward() do
-    if not bak.aggressive or not turtle.dig() then
+    if not bak.eatMaybe(turtle.inspect, turtle.dig) then
       return false
     end
   end
@@ -147,7 +210,7 @@ end
 function bak.up()
   bak.suckUp()
   while not turtle.up() do
-    if not bak.aggressive or not turtle.digUp() then
+    if not bak.eatMaybe(turtle.inspectUp, turtle.digUp) then
       return false
     end
   end
@@ -158,7 +221,7 @@ end
 function bak.down()
   bak.suckDown()
   while not turtle.down() do
-    if not bak.aggressive or not turtle.digDown() then
+    if not bak.eatMaybe(turtle.inspectDown, turtle.digDown) then
       return false
     end
   end
@@ -215,23 +278,25 @@ function bak.moveBy(x, y, z)
     end
     return true
   end
+  local success = true
   if abs(x) < abs(z) then
-    tryMove(bak.faceX, x)
-    tryMove(bak.faceZ, z)
+    success = success and tryMove(bak.faceX, x)
+    success = success and tryMove(bak.faceZ, z)
   else
-    tryMove(bak.faceZ, z)
-    tryMove(bak.faceX, x)
+    success = success and tryMove(bak.faceZ, z)
+    success = success and tryMove(bak.faceX, x)
   end
   mover = (y>0) and bak.up or bak.down
   for i=1,abs(y) do
-    mover()
+    success = success and mover()
   end
+  return success
 end
 
 function bak.moveTo(x, y, z)
   local p = bak.position
   local dx, dy, dz = x-p.x, y-p.y, z-p.z
-  bak.moveBy(dx, dy, dz)
+  return bak.moveBy(dx, dy, dz)
 end
 
 function bak.resetPosition()
@@ -314,16 +379,44 @@ function bak.dumpInventory()
   turtle.select(slot)
 end
 
+function bak.getItemName(i)
+  if turtle.getItemCount(i) == 0 then
+    return ""
+  end
+  return turtle.getItemDetail(i).name
+end
+
 function bak.selectItemName(name)
   for i=1,16 do
-    if turtle.getItemCount(i) > 0 then
-      if turtle.getItemDetail(i).name == name then
-        turtle.select(i)
-        return true
-      end
+    if bak.getItemName(i) == name then
+      turtle.select(i)
+      return true
     end
   end
   return false
+end
+
+function bak.getTotalItemCount(name)
+  local count = 0
+  for i=1,16 do
+    if bak.getItemName(i) == name then
+      count = count + turtle.getItemCount(i)
+    end
+  end
+  return count
+end
+
+function bak.useItems(name, maxItems, useFunc)
+  while bak.selectItemName(name) and maxItems > 0 do
+    local count = turtle.getItemCount()
+    local toUse = (count < maxItems) and count or maxItems
+    if useFunc() then
+      maxItems = maxItems - toUse
+    else
+      return false
+    end
+  end
+  return maxItems <= 0
 end
 
 function bak.smartRefuel(options)
@@ -380,6 +473,238 @@ function bak.organizeInventory()
         itemMap[name] = i
       end
     end
+  end
+end
+
+function bak.calibrateGps()
+  local pos = {
+    x = bak.position.x,
+    y = bak.position.y,
+    z = bak.position.z
+  }
+
+  local rot = {
+    x = bak.facing.x,
+    z = bak.facing.z
+  }
+
+  bak.gpsSync()
+
+  local dx = (pos.x - bak.position.x) * bak.gpsScale.x
+  local dy = (pos.y - bak.position.y) * bak.gpsScale.y
+  local dz = (pos.z - bak.position.z) * bak.gpsScale.z
+
+  bak.gpsOffset.x = bak.gpsOffset.x + dx
+  bak.gpsOffset.y = bak.gpsOffset.y + dy
+  bak.gpsOffset.z = bak.gpsOffset.z + dz
+
+  print(string.format(
+    "Recalibrated: offset = %d, %d, %d",
+    bak.gpsOffset.x,
+    bak.gpsOffset.y,
+    bak.gpsOffset.z
+  ))
+
+  bak.gpsSync()
+  bak.saveGpsCalibration()
+  bak.moveTo(pos.x, pos.y, pos.z)
+end
+
+function bak.saveGpsCalibration()
+  local h = fs.open("gps-calib.dat", "w")
+  h.writeLine(string.format("%d", bak.gpsOffset.x))
+  h.writeLine(string.format("%d", bak.gpsOffset.y))
+  h.writeLine(string.format("%d", bak.gpsOffset.z))
+  h.writeLine(string.format("%d", bak.gpsScale.x))
+  h.writeLine(string.format("%d", bak.gpsScale.y))
+  h.writeLine(string.format("%d", bak.gpsScale.z))
+  h.close()
+end
+
+function bak.loadGpsCalibration()
+  if not fs.exists("gps-calib.dat") then
+    print("No saved gps calibration exists.")
+    return false
+  end
+  print("Loading calibration information from file.")
+  local h = fs.open("gps-calib.dat", "r")
+
+  local text = h.readAll()
+
+  if text == "" then
+    print("Save file is empty, no calibration to load.")
+    return true
+  end
+
+  local lines = {}
+  local i = 1
+  
+  for token in string.gmatch(text, "[^\n]+") do
+   lines[i] = token
+   i = i + 1
+  end
+
+  if i ~= 7 then
+    print("Save file is corrupt.")
+    return false
+  end
+
+  bak.gpsOffset.x = tonumber(lines[1])
+  bak.gpsOffset.y = tonumber(lines[2])
+  bak.gpsOffset.z = tonumber(lines[3])
+  bak.gpsScale.x = tonumber(lines[4])
+  bak.gpsScale.y = tonumber(lines[5])
+  bak.gpsScale.z = tonumber(lines[6])
+  h.close()
+  print(string.format(
+    "x=%d, y=%d, z=%d, scale=(%d, %d, %d)",
+    bak.gpsOffset.x,
+    bak.gpsOffset.y,
+    bak.gpsOffset.z,
+    bak.gpsScale.x,
+    bak.gpsScale.y,
+    bak.gpsScale.z
+  ))
+
+  bak.gpsSync()
+  return true
+end
+
+function bak.gpsSync()
+  -- First check to see if we have a modem equipped in either hand.
+  -- If not, see if our inventory has a modem, and equip it.
+  -- Then ask for GPS position.
+
+  local offset = bak.gpsOffset
+  local scale = bak.gpsScale
+
+  function query()
+    local x, y, z = gps.locate()
+    if not x then
+      print("Failed to find GPS location.")
+      return false
+    end
+
+    local gx, gy, gz = x, y, z
+
+    x = (x + offset.x) * scale.x
+    y = (y + offset.y) * scale.y
+    z = (z + offset.z) * scale.z
+
+    print(string.format("GPS location: %d, %d, %d.", x, y, z))
+
+    bak.position.x = x
+    bak.position.y = y
+    bak.position.z = z
+
+    local ox, oy, oz = x, y, z
+
+    print("Determining turtle orientation")
+
+    local ups = 0
+    local stuck = true
+    local turns = 0
+    while stuck do
+      for i=1,4 do
+        if bak.forward() then
+          x, y, z = gps.locate()
+
+          local dx = sign((x - gx) * scale.x)
+          local dz = sign((z - gz) * scale.z)
+
+          x = (x + offset.x) * scale.x
+          y = (y + offset.y) * scale.y
+          z = (z + offset.z) * scale.z
+
+          bak.facing.x = dx
+          bak.facing.z = dz
+
+          bak.position.x = x
+          bak.position.y = y
+          bak.position.z = z
+
+          print(string.format("Pos x=%d, y=%d, z=%d", x, y, z))
+          print(string.format("Facing x=%d, z=%d", bak.facing.x, bak.facing.z))
+
+          bak.moveTo(ox, oy, oz)
+          return true
+        end
+        bak.turnRight()
+        turns = turns + 1
+      end
+
+      if stuck then
+        if not bak.up() then 
+          print("Turtle appears to be trapped, and cannot determine its rotation.")
+          return false
+        end
+        ups = ups + 1
+      end
+    end
+
+    for i=1,ups do
+      bak.down()
+    end
+
+    return false
+  end
+
+  function isModemSelected()
+    local detail = turtle.getItemDetail()
+    return (detail ~= nil and detail.name == "ComputerCraft:CC-Peripheral" and detail.damage == 1)
+  end
+
+  for i=1,16 do
+    turtle.select(i)
+    if isModemSelected() then
+      print("Equipping modem to make gps query.")
+      turtle.equipLeft() -- equip modem
+      local result = query()
+      print("Unequipping modem again.")
+      turtle.equipLeft() -- unequip modem
+      return result
+    end
+  end
+
+  -- Find an empty spot in the inventory.
+  local foundEmptySlot = false
+  for i=1,16 do
+    if turtle.getItemCount(i) == 0 then
+      turtle.select(i)
+      foundEmptySlot = true
+      break
+    end
+  end
+
+  if foundEmptySlot then 
+    turtle.equipLeft()
+    if isModemSelected() then
+      print("Found a modem in my left hand.")
+      hasModem = true
+    end
+    turtle.equipLeft()
+
+    if hasModem then
+      return query()
+    end
+
+    turtle.equipRight()
+    if isModemSelected() then
+      print("Found a modem in my right hand.")
+      hasModem = true
+    end
+    turtle.equipRight()
+
+    if hasModem then
+      return query()
+    end
+
+    print("Turtle has no modem in inventory or in equipment.")
+    return false
+  else 
+    print("Turtle has no space to check to see if it has a modem.")
+    print("Trying to query, hoping for the best.")
+    return query()
   end
 end
 

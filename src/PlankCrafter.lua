@@ -1,5 +1,4 @@
-print("Loading library...")
-os.loadAPI("Library")
+#include Library.lua
 
 LOG_ID = "minecraft:log"
 PLANKS_ID = "minecraft:planks"

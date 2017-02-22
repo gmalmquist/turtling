@@ -20,15 +20,13 @@ function createFuel()
     local sawLogs = false
     for i=1,16 do
       if turtle.getItemCount(i) > 0 then
-        if turtle.getItemDetail(i) ~= MODEM_ID then
-          if sawLogs or turtle.getItemDetail(i).name ~= LOG_ID then
-            turtle.select(i)
-            bak.drop()
-          elseif turtle.getItemDetail(i).name == LOG_ID then
-            sawLogs = true
-          end
+        if sawLogs or turtle.getItemDetail(i).name ~= LOG_ID then
+          turtle.select(i)
+          bak.drop()
+        elseif turtle.getItemDetail(i).name == LOG_ID then
+          sawLogs = true
         end
-      end 
+      end
     end
     return sawLogs
   end

@@ -40,6 +40,8 @@ bak = {
   position={x=0,y=0,z=0},
   aggressive=false,
   eats=nil,
+  gpsOffset={x=0,y=0,z=0},
+  gpsScale={x=1,y=1,z=-1}
 }
 
 bak.suck = turtle.suck
@@ -260,6 +262,7 @@ function bak.setFacing(x, z)
 end
 
 function bak.moveBy(x, y, z)
+  print(string.format("moveBy %d, %d, %d", x, y, z))
   function tryMove(facer, amount)
     if amount == 0 then
       return true
@@ -472,37 +475,63 @@ function bak.organizeInventory()
   end
 end
 
-function bak.saveState()
-  local pos = bak.position
-  local rot = bak.facing
-  local h = fs.open("save-state.dat", "w")
-  h.writeLine(string.format("%d", pos.x))
-  h.flush()
-  h.writeLine(string.format("%d", pos.y))
-  h.flush()
-  h.writeLine(string.format("%d", pos.z))
-  h.flush()
-  h.writeLine(string.format("%d", rot.x))
-  h.flush()
-  h.writeLine(string.format("%d", rot.z))
-  h.close()
-  sleep(0) -- yield execution after saving state
+function bak.calibrateGps()
+  local pos = {
+    x = bak.position.x,
+    y = bak.position.y,
+    z = bak.position.z
+  }
+
+  local rot = {
+    x = bak.facing.x,
+    z = bak.facing.z
+  }
+
+  bak.gpsSync()
+
+  local dx = (pos.x - bak.position.x) * bak.gpsScale.x
+  local dy = (pos.y - bak.position.y) * bak.gpsScale.y
+  local dz = (pos.z - bak.position.z) * bak.gpsScale.z
+
+  bak.gpsOffset.x = bak.gpsOffset.x + dx
+  bak.gpsOffset.y = bak.gpsOffset.y + dy
+  bak.gpsOffset.z = bak.gpsOffset.z + dz
+
+  print(string.format(
+    "Recalibrated: offset = %d, %d, %d",
+    bak.gpsOffset.x,
+    bak.gpsOffset.y,
+    bak.gpsOffset.z
+  ))
+
+  bak.gpsSync()
+  bak.saveGpsCalibration()
+  bak.moveTo(pos.x, pos.y, pos.z)
 end
 
-function bak.loadState()
-  if not fs.exists("save-state.dat") then
-    print("No save state exists.")
+function bak.saveGpsCalibration()
+  local h = fs.open("gps-calib.dat", "w")
+  h.writeLine(string.format("%d", bak.gpsOffset.x))
+  h.writeLine(string.format("%d", bak.gpsOffset.y))
+  h.writeLine(string.format("%d", bak.gpsOffset.z))
+  h.writeLine(string.format("%d", bak.gpsScale.x))
+  h.writeLine(string.format("%d", bak.gpsScale.y))
+  h.writeLine(string.format("%d", bak.gpsScale.z))
+  h.close()
+end
+
+function bak.loadGpsCalibration()
+  if not fs.exists("gps-calib.dat") then
+    print("No saved gps calibration exists.")
     return false
   end
-  print("Loading orientation information from file.")
-  local pos = bak.position
-  local rot = bak.facing
-  local h = fs.open("save-state.dat", "r")
+  print("Loading calibration information from file.")
+  local h = fs.open("gps-calib.dat", "r")
 
   local text = h.readAll()
 
   if text == "" then
-    print("Save file is empty, assuming we're at the origin already.")
+    print("Save file is empty, no calibration to load.")
     return true
   end
 
@@ -514,38 +543,39 @@ function bak.loadState()
    i = i + 1
   end
 
-  if i ~= 6 then
+  if i ~= 7 then
     print("Save file is corrupt.")
     return false
   end
 
-  pos.x = tonumber(lines[1])
-  pos.y = tonumber(lines[2])
-  pos.z = tonumber(lines[3])
-  rot.x = tonumber(lines[4])
-  rot.z = tonumber(lines[5])
+  bak.gpsOffset.x = tonumber(lines[1])
+  bak.gpsOffset.y = tonumber(lines[2])
+  bak.gpsOffset.z = tonumber(lines[3])
+  bak.gpsScale.x = tonumber(lines[4])
+  bak.gpsScale.y = tonumber(lines[5])
+  bak.gpsScale.z = tonumber(lines[6])
   h.close()
   print(string.format(
-    "x=%d, y=%d, z=%d, faceX=%d, faceZ=%d",
-    pos.x, pos.y, pos.z, rot.x, rot.z
+    "x=%d, y=%d, z=%d, scale=(%d, %d, %d)",
+    bak.gpsOffset.x,
+    bak.gpsOffset.y,
+    bak.gpsOffset.z,
+    bak.gpsScale.x,
+    bak.gpsScale.y,
+    bak.gpsScale.z
   ))
+
+  bak.gpsSync()
   return true
 end
 
-function bak.clearState() 
-  if not fs.exists("save-state.dat") then
-    print("No state to clear.")
-    return
-  else
-    print("Deleting old orientation information.")
-    fs.delete("save-state.dat")
-  end
-end
-
-function bak.gpsSync(offset, scale)
+function bak.gpsSync()
   -- First check to see if we have a modem equipped in either hand.
   -- If not, see if our inventory has a modem, and equip it.
   -- Then ask for GPS position.
+
+  local offset = bak.gpsOffset
+  local scale = bak.gpsScale
 
   function query()
     local x, y, z = gps.locate()
@@ -553,6 +583,8 @@ function bak.gpsSync(offset, scale)
       print("Failed to find GPS location.")
       return false
     end
+
+    local gx, gy, gz = x, y, z
 
     x = (x + offset.x) * scale.x
     y = (y + offset.y) * scale.y
@@ -564,20 +596,24 @@ function bak.gpsSync(offset, scale)
     bak.position.y = y
     bak.position.z = z
 
+    local ox, oy, oz = x, y, z
+
     print("Determining turtle orientation")
 
+    local ups = 0
     local stuck = true
+    local turns = 0
     while stuck do
       for i=1,4 do
-        if turtle.forward() then
+        if bak.forward() then
           x, y, z = gps.locate()
+
+          local dx = sign((x - gx) * scale.x)
+          local dz = sign((z - gz) * scale.z)
 
           x = (x + offset.x) * scale.x
           y = (y + offset.y) * scale.y
           z = (z + offset.z) * scale.z
-
-          local dx = x - bak.position.x
-          local dz = z - bak.position.z 
 
           bak.facing.x = dx
           bak.facing.z = dz
@@ -586,18 +622,27 @@ function bak.gpsSync(offset, scale)
           bak.position.y = y
           bak.position.z = z
 
-          bak.moveBy(0, 0, -1)
+          print(string.format("Pos x=%d, y=%d, z=%d", x, y, z))
+          print(string.format("Facing x=%d, z=%d", bak.facing.x, bak.facing.z))
+
+          bak.moveTo(ox, oy, oz)
           return true
         end
-        turtle.turnRight() 
+        bak.turnRight()
+        turns = turns + 1
       end
 
       if stuck then
-        if not turtle.up() then 
+        if not bak.up() then 
           print("Turtle appears to be trapped, and cannot determine its rotation.")
           return false
         end
+        ups = ups + 1
       end
+    end
+
+    for i=1,ups do
+      bak.down()
     end
 
     return false

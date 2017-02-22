@@ -41,6 +41,8 @@ bak = {
   aggressive=false,
   eats=nil,
   gpsOffset={x=0,y=0,z=0},
+  -- NB: z has to be negative here, because the turnLeft/Right methods
+  -- only work properly if they can make assumptions about right-hand rules.
   gpsScale={x=1,y=1,z=-1}
 }
 
@@ -262,7 +264,6 @@ function bak.setFacing(x, z)
 end
 
 function bak.moveBy(x, y, z)
-  print(string.format("moveBy %d, %d, %d", x, y, z))
   function tryMove(facer, amount)
     if amount == 0 then
       return true

@@ -56,8 +56,17 @@ class Installer(object):
       yield '\n'
 
   def process_file(self, src, dst):
+    data = ''.join(self.processed_file_lines(src))
+    if os.path.exists(dst):
+      with open(dst, 'r') as f:
+        prev = f.read()
+      if prev == data:
+        print(' noop: ', end='')
+        return
+      print(' removing existing file... '.format(dst), end='')
+      os.remove(dst)
     with open(dst, 'w') as f:
-      f.write(''.join(self.processed_file_lines(src)))
+      f.write(data)
 
   def install_file(self, src):
     src = os.path.normpath(src)
@@ -74,9 +83,6 @@ class Installer(object):
       dst = os.path.normpath(os.path.join(folder, dst_name))
       hr_rel_dst = os.path.relpath(dst, self.computer_folder)
       print('Installing {} -> {} ... '.format(os.path.basename(src), hr_rel_dst), end='')
-      if os.path.exists(dst):
-        print(' removing existing file... '.format(dst), end='')
-        os.remove(dst)
       self.process_file(src, dst)
       print('Done.')
 

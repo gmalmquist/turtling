@@ -1,0 +1,9 @@
+
+-- begin Requip.lua --
+select(1)
+turtle.equipLeft(1)
+select(2)
+turtle.equipRight(2)
+
+-- end Requip.lua --
+

@@ -7,20 +7,25 @@ import re
 import shutil
 
 
-SAVE_PATH = 'C:\\Finicky\\FTB\\FTBInfinity\\minecraft\\saves\\Termina'
+SAVE_PATH = '/home/g/ftb/Termina/computer'
 COMPUTER_SCOPE_PATTERN = re.compile(r'^(.*?)__(\d+)$')
 
 
 class Installer(object):
 
-  def __init__(self, save_path):
+  def __init__(self, save_path, root, install_in_subfolders=True):
     self.save_path = save_path
+    self.root = root
+    self.install_in_subfolders = install_in_subfolders
   
   @property 
   def computer_folder(self):
-    return os.path.join(self.save_path, 'computer')
+    return self.save_path
 
   def computers_iter(self):
+    if not self.install_in_subfolders:
+      yield self.computer_folder
+      return
     for name in os.listdir(self.computer_folder):
       path = os.path.join(self.computer_folder, name)
       if os.path.isdir(path):
@@ -76,11 +81,16 @@ class Installer(object):
       print('Done.')
 
   def install(self):
-    root = os.path.abspath('src')
+    root = self.root
     for name in os.listdir(root):
-      self.install_file(os.path.join(root, name))
+      if name.endswith('.lua'):
+        self.install_file(os.path.join(root, name))
 
 
 if __name__ == '__main__':
-  installer = Installer(SAVE_PATH)
+  installer = Installer(SAVE_PATH, os.path.abspath('src/universal'))
   installer.install()
+
+  installer = Installer(os.path.abspath('bin'), os.path.abspath('src'), False)
+  installer.install()
+

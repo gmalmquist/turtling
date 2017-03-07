@@ -7,7 +7,7 @@ DIRT_ID = "minecraft:dirt"
 GRASS_ID = "minecraft:grass"
 MODEM_ID = "ComputerCraft:CC-Peripheral"
 
-treeRows = 4
+treeRows = 8
 treeCols = 4
 
 function createFuel()
@@ -253,7 +253,7 @@ function patrol()
   end
 end
 
-bak.aggressive = true
+bak.eats = bak.Set({"minecraft:log", "minecraft:leaves", "minecraft:sapling"})
 
 ensureFuel()
 while true do
@@ -262,8 +262,6 @@ while true do
   ensureFuel()
   unloadItems()
 end
-
-bak.aggressive = false
 
 print("")
 print("Done.")

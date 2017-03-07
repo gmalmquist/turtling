@@ -62,6 +62,8 @@ bak.drop = turtle.drop
 bak.dropDown = turtle.dropDown
 bak.dropUp = turtle.dropUp
 
+bak.select = turtle.select
+
 function bak.Stack()
   local stack = {index=0}
 
@@ -188,9 +190,13 @@ function bak.eatMaybe(inspector, digger)
   end
 
   local success, data = inspector()
-  print(string.format("Can we aggressively eat %s?", data.name))
-  if success and bak.eats and bak.eats.contains(data.name) then 
+  print(string.format("Can we aggressively eat %s?", data.name or data))
+  if success and bak.eats and bak.eats.contains(data.name or "??") then 
     return digger()
+  end
+
+  if not success or not data.name then
+    return bak.smartRefuel()
   end
 
   return false
@@ -566,8 +572,7 @@ function bak.loadGpsCalibration()
     bak.gpsScale.z
   ))
 
-  bak.gpsSync()
-  return true
+  return bak.gpsSync()
 end
 
 function bak.gpsSync()
@@ -586,6 +591,12 @@ function bak.gpsSync()
     end
 
     local gx, gy, gz = x, y, z
+
+    h = fs.open("current-pos.txt", "w")
+    h.writeLine(string.format("x=%d", gx))
+    h.writeLine(string.format("y=%d", gy))
+    h.writeLine(string.format("z=%d", gz))
+    h.close()
 
     x = (x + offset.x) * scale.x
     y = (y + offset.y) * scale.y
@@ -796,7 +807,6 @@ function bak.mineDFS(options)
   end
 
 end
-
 
 function bak.testBasicMovement()
   print("Testing relative movement.")

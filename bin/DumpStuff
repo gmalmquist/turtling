@@ -1,7 +1,0 @@
-
--- begin DumpStuff.lua --
-print("Loading library...")
-os.loadAPI("Library")
-bak.dumpInventory()
--- end DumpStuff.lua --
-

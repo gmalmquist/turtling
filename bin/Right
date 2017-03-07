@@ -1,5 +1,0 @@
-
--- begin Right.lua --
-turtle.turnRight()
--- end Right.lua --
-

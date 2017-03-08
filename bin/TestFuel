@@ -1,7 +1,0 @@
-
--- begin TestFuel.lua --
-os.loadAPI("Library")
-bak.refuel(2)
-
--- end TestFuel.lua --
-

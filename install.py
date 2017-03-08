@@ -97,6 +97,3 @@ if __name__ == '__main__':
   installer = Installer(SAVE_PATH, os.path.abspath('src/universal'))
   installer.install()
 
-  installer = Installer(os.path.abspath('bin'), os.path.abspath('src'), False)
-  installer.install()
-

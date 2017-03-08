@@ -102,15 +102,30 @@ function process_download(properties, out)
     print("Cannot download nil or '' url.")
     return false
   end
+
+  print(url)
+
   if included[url] then
+    print(string.format("skipping already-downloaded %s", url))
     return true -- We already included this file.
   end
   included[url] = true
 
-  local h = http.get(url)
+  local headers = {}
+  headers["Cache-Control"] = "no-cache"
+  headers["Pragma"] = "no-cache"
+  headers["Expires"] = "0"
+
+  local h = http.get(url, headers)
   if h ~= nil then
+    if h.getResponseCode() ~= 200 then
+      print(string.format("server returned %d", h.getResponseCode()))
+      return false
+    end
+    local li = 0
     local line = h.readLine()
     while line ~= nil do
+      li = li + 1
       if not process_line(line) then
         print(string.format("Unable to process: %s", line))
         h.close()
@@ -119,6 +134,7 @@ function process_download(properties, out)
       line = h.readLine()
     end
     h.close()
+    print(string.format("  %d lines from %s", li, properties.path))
     return true
   else
     print(string.format("404 - %s", url))
@@ -160,6 +176,10 @@ function download_script(properties)
     end
 
     print(string.format("Downloading to '%s' ...", target_name))
+    if fs.exists(target_name) then
+      print("deleting existing ", target_name)
+      fs.delete(target_name)
+    end
     local h = fs.open(target_name, "w")
     local result = process_download({
       org = org,

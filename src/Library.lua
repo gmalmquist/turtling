@@ -50,9 +50,73 @@ bak.suck = turtle.suck
 bak.suckUp = turtle.suckUp
 bak.suckDown = turtle.suckDown
 
-bak.place = turtle.place
-bak.placeUp = turtle.placeUp
-bak.placeDown = turtle.placeDown
+function bak.findSlot(name, damage)
+  for i=1,16 do
+    local detail = turtle.getItemDetail(i)
+    if detail then
+      if detail.name == name and (damage == nil or detail.damage == damage) then
+        return i
+      end
+    end
+  end
+  return nil
+end
+
+function bak.trySelect(name, damage)
+  local slot = bak.findSlot(name, damage)
+  if slot ~= nil then
+    bak.select(slot)
+    return true
+  end
+  return false
+end
+
+function bak.place(name, damage, placefunc)
+  placefunc = placefunc or turtle.place
+  if name == nil or bak.trySelect(name, damage) then
+    placefunc()
+    return true
+  end
+  return false
+end
+
+function bak.placeUp(name, damage)
+  return bak.place(name, damage, turtle.placeUp)
+end
+
+function bak.placeDown(name, damage)
+  return bak.place(name, damage, turtle.placeDown)
+end
+
+function bak.replace(name, damage, placef, inspectf, digf)
+  placef = placef or bak.place
+  inspectf = inspectf or turtle.inspect
+  digf = digf or turtle.dig
+
+  local blocked, details = inspectf()
+  if blocked then
+    if details.name == name and (damage == nil or details.damage == damage) then
+      print(string.format("%s is already there.", name))
+      return true -- the block we want is already there.
+    end
+    if bak.eatMaybe(inspectf, digf) then
+      print(string.format("Ate %s below us.", details.name))
+      return placef(name, damage)
+    end
+    return false -- we couldn't remove the existing block
+  end
+  -- we're not blocked, just try to put something down.
+  print("Not blocked.")
+  return placef(name, damage);
+end
+
+function bak.replaceUp(name, damage)
+  return bak.replace(name, damage, bak.placeUp, turtle.inspectUp, turtle.digUp)
+end
+
+function bak.replaceDown(name, damage)
+  return bak.replace(name, damage, bak.placeDown, turtle.inspectDown, turtle.digDown)
+end
 
 bak.dig = turtle.dig
 bak.digUp = turtle.digUp
@@ -211,6 +275,14 @@ function bak.forward()
   end
   bak._addpos(bak.facing.x, 0, bak.facing.z)
   return true
+end
+
+function bak.back()
+  if turtle.back() then
+    bak._addpos(-bak.facing.x, 0, -bak.facing.z)
+    return true
+  end
+  return false
 end
 
 function bak.up()

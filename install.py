@@ -5,6 +5,7 @@ from __future__ import print_function, with_statement
 import os
 import re
 import shutil
+import sys
 
 
 SAVE_PATH = '/home/g/ftb/Termina/computer'
@@ -43,7 +44,10 @@ class Installer(object):
           yield line 
           continue
         include_path = line.strip()[len(include_prefix):].strip()
-        include_path = os.path.join(os.path.dirname(src), include_path)
+        if include_path.startswith('/'):
+          include_path = include_path[1:]
+        else:
+          include_path = os.path.join(os.path.dirname(src), include_path)
         if not os.path.exists(include_path):
           print('Error {}: Include not found: {}.'.format(src, include_path))
         if include_path in processed:
@@ -96,4 +100,17 @@ class Installer(object):
 if __name__ == '__main__':
   installer = Installer(SAVE_PATH, os.path.abspath('src/universal'))
   installer.install()
+
+  args = sys.argv[1:]
+  if len(args) >= 2:
+    source = args[0]
+    computers = args[1:]
+    name = os.path.basename(source)
+    if '.' in name:
+      name = name[:name.rfind('.')]
+    for c in computers:
+      print('Install %s -> %s' % (source, c), end=' ')
+      installer.process_file(os.path.abspath(source), os.path.join(SAVE_PATH, c, name))
+      print('  Done.')
+      
 

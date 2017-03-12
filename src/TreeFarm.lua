@@ -426,6 +426,7 @@ function maintainTrees()
   end
 
   while true do
+    os.sleep(0)
     if isF("") then
       i = i + 1
       if i % 2 == 0 then
